@@ -1,0 +1,11 @@
+<svg width="205px" height="205px" viewBox="-1.26 -1.26 23.52 23.52" xmlns="http://www.w3.org/2000/svg" fill="none">
+  <g transform="translate(4 2)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Bottom Arrow (blue) -->
+    <path d="m4.5 8.5-4 4 4 4" stroke="#38B6FF"/> <!-- Left arrow -->
+    <path d="m12.5 12.5h-12" stroke="#38B6FF"/> <!-- Horizontal blue -->
+
+    <!-- Top Arrow (yellow) -->
+    <path d="m8.5.5 4 4-4 4" stroke="#FDD15D"/> <!-- Right arrow -->
+    <path d="m12.5 4.5h-12" stroke="#FDD15D"/> <!-- Horizontal yellow -->
+  </g>
+</svg>
