@@ -1,75 +1,61 @@
-"use client";
+// components/ExchangeForm.tsx
+'use client';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function ExchangeForm() {
+  const router = useRouter();
   const [fromCurrency, setFromCurrency] = useState('BTC');
   const [toCurrency, setToCurrency] = useState('USDT');
-  const [amount, setAmount] = useState('0.008166');
-  const [address, setAddress] = useState('');
-  const [orderType, setOrderType] = useState('fixed');
+  const [amount, setAmount] = useState('');
+  const [rateType, setRateType] = useState<'fixed' | 'float'>('fixed');
+  const [exchangeRate, setExchangeRate] = useState(0);
+  const [calculatedAmount, setCalculatedAmount] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [showAddressInput, setShowAddressInput] = useState(false);
-  const [rateInfo, setRateInfo] = useState<any>(null);
 
-  // Real-time rate calculation
-  useEffect(() => {
-    if (amount && parseFloat(amount) > 0) {
-      calculateRate();
-    }
-  }, [fromCurrency, toCurrency, amount, orderType]);
-
-  const calculateRate = async () => {
+  // FixedFloat جیسی colors اور styling
+  const fetchExchangeRate = async (from: string, to: string, type: string) => {
+    setLoading(true);
     try {
-      const response = await fetch('/api/exchange/rate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          fromCurrency,
-          toCurrency,
-          amount: parseFloat(amount),
-          orderType
-        }),
-      });
-
+      const response = await fetch(`/api/fixedfloat/coin-rate?type=${type}`);
       const data = await response.json();
-      if (data.success) {
-        setRateInfo(data);
+      
+      const rate = data[from]?.[to] || 0;
+      setExchangeRate(rate);
+      
+      if (amount && !isNaN(parseFloat(amount))) {
+        const calculated = (parseFloat(amount) * rate).toFixed(6);
+        setCalculatedAmount(calculated);
       }
     } catch (error) {
-      console.error('Rate calculation error:', error);
+      console.error('Error fetching rate:', error);
     }
+    setLoading(false);
   };
 
-  const handleFirstExchangeClick = (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  useEffect(() => {
+    if (fromCurrency && toCurrency) {
+      fetchExchangeRate(fromCurrency, toCurrency, rateType);
+    }
+  }, [fromCurrency, toCurrency, rateType]);
+
+  useEffect(() => {
+    if (amount && exchangeRate > 0) {
+      const calculated = (parseFloat(amount) * exchangeRate).toFixed(6);
+      setCalculatedAmount(calculated);
+    } else {
+      setCalculatedAmount('0.00');
+    }
+  }, [amount, exchangeRate]);
+
+  const handleExchange = async () => {
     if (!amount || parseFloat(amount) <= 0) {
-      setError('Please enter a valid amount');
+      alert('Please enter a valid amount');
       return;
     }
-
-    // ✅ FIXEDFLOAT STYLE: Pehle address input show karo
-    setShowAddressInput(true);
-    setError('');
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-  };
-
-  const handleFinalExchange = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    if (!address.trim()) {
-      setError('Please enter your destination address');
-      setLoading(false);
-      return;
-    }
-
+    
     try {
-      const response = await fetch('/api/exchange/create', {
+      const response = await fetch('/api/fixedfloat/create-order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -78,207 +64,135 @@ export default function ExchangeForm() {
           fromCurrency,
           toCurrency,
           amount: parseFloat(amount),
-          address,
-          orderType,
-          rate: rateInfo?.rate,
-          expectedAmount: rateInfo?.expectedAmount
-        }),
+          rateType
+        })
       });
-
-      const data = await response.json();
-
-      if (data.success) {
-        window.location.href = `/order/${data.order.id}`;
+      
+      const orderData = await response.json();
+      
+      if (orderData.success) {
+        // Success par exchange page par redirect karen
+        router.push('/exchange');
       } else {
-        setError(data.error || 'Exchange creation failed');
+        alert('Failed to create order: ' + orderData.error);
       }
-
-    } catch (err) {
-      setError('Network error. Please try again.');
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      alert('Error creating order');
     }
   };
 
   return (
-    <div className="max-w-md mx-auto bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 text-center">
-        Instant Exchange
-      </h2>
-
-      <form onSubmit={showAddressInput ? handleFinalExchange : handleFirstExchangeClick} className="space-y-6">
-        {/* Send Section */}
-        <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Send
-          </label>
-          <div className="flex justify-between items-center">
-            <input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="bg-transparent text-2xl font-bold text-gray-900 dark:text-white w-32 border-none focus:outline-none"
-              step="0.000001"
-            />
-            <select
-              value={fromCurrency}
-              onChange={(e) => setFromCurrency(e.target.value)}
-              className="bg-transparent border-none text-gray-900 dark:text-white font-semibold focus:outline-none"
-            >
-              <option value="BTC">BTC</option>
-              <option value="ETH">ETH</option>
-              <option value="AAVEETH">AAVEETH</option>
-              <option value="USDT">USDT</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Exchange Rate Display */}
-        {rateInfo && (
-          <div className="text-center text-sm text-gray-600 dark:text-gray-400 space-y-1">
-            <p>1 {fromCurrency} = {rateInfo.rate} {toCurrency}</p>
-            <p className="text-green-600 font-semibold">
-              ${(parseFloat(amount) * 45000).toFixed(2)}
-            </p>
-          </div>
-        )}
-
-        {/* Receive Section */}
-        <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Receive
-          </label>
-          <div className="flex justify-between items-center">
-            <span className="text-2xl font-bold text-gray-900 dark:text-white">
-              {rateInfo ? rateInfo.expectedAmount : '0.00'}
-            </span>
-            <select
-              value={toCurrency}
-              onChange={(e) => setToCurrency(e.target.value)}
-              className="bg-transparent border-none text-gray-900 dark:text-white font-semibold focus:outline-none"
-            >
-              <option value="USDT">USDT</option>
-              <option value="ADA">ADA</option>
-              <option value="BTC">BTC</option>
-              <option value="ETH">ETH</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Order Type */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-            Order type
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label className={`flex flex-col p-3 border rounded-lg cursor-pointer transition-all ${
-              orderType === 'fixed' 
-                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
-                : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'
-            }`}>
-              <div className="flex items-center mb-1">
-                <input
-                  type="radio"
-                  name="orderType"
-                  value="fixed"
-                  checked={orderType === 'fixed'}
-                  onChange={(e) => setOrderType(e.target.value)}
-                  className="text-blue-600 focus:ring-blue-500"
-                />
-                <span className="ml-2 text-sm font-medium text-gray-900 dark:text-white">
-                  Fixed rate
-                </span>
-              </div>
-              <span className="text-xs text-gray-500 dark:text-gray-400 ml-6">
-                (1.0%)
-              </span>
-            </label>
-            
-            <label className={`flex flex-col p-3 border rounded-lg cursor-pointer transition-all ${
-              orderType === 'float' 
-                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
-                : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'
-            }`}>
-              <div className="flex items-center mb-1">
-                <input
-                  type="radio"
-                  name="orderType"
-                  value="float"
-                  checked={orderType === 'float'}
-                  onChange={(e) => setOrderType(e.target.value)}
-                  className="text-blue-600 focus:ring-blue-500"
-                />
-                <span className="ml-2 text-sm font-medium text-gray-900 dark:text-white">
-                  Float rate
-                </span>
-              </div>
-              <span className="text-xs text-gray-500 dark:text-gray-400 ml-6">
-                (0.5%)
-              </span>
-            </label>
-          </div>
-        </div>
-
-        {/* ✅ DESTINATION ADDRESS INPUT - Only shows after first click */}
-        {showAddressInput && (
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-6 animate-fadeIn">
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Destination
-              </h3>
-              <div className="mb-2">
-                <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
-                  {toCurrency === 'USDT' ? 'TRC20' : toCurrency}
-                </span>
-              </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                Enter your {toCurrency === 'USDT' ? 'Tether (TRC20)' : toCurrency} address
-              </p>
-              <input
-                type="text"
-                placeholder={`Your ${toCurrency} address...`}
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                autoFocus
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Error Message */}
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg text-sm animate-fadeIn">
-            {error}
-          </div>
-        )}
-
-        {/* Exchange Now Button */}
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-lg shadow-lg hover:shadow-xl"
-        >
-          {loading ? 'Processing...' : 'Exchange now'}
-        </button>
-
-        {/* Terms */}
-        <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-          By using the site and creating an exchange, you agree to the FixedFloat's 
-          Terms of Service and Privacy Policy.
+    <div className="max-w-md mx-auto bg-gradient-to-br from-gray-900 to-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700">
+      <h3 className="text-xl font-bold mb-4 text-white text-center">Instant Exchange</h3>
+      
+      {/* Current Rate Display - FixedFloat jaisa style */}
+      <div className="mb-6 p-4 bg-gray-800 rounded-lg border border-gray-600">
+        <p className="text-sm text-gray-400">Current Rate ({rateType})</p>
+        <p className="text-lg font-semibold text-white">
+          {loading ? 'Loading...' : `1 ${fromCurrency} = ${exchangeRate.toFixed(6)} ${toCurrency}`}
         </p>
-      </form>
+      </div>
+      
+      {/* From Currency - Dark theme */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium mb-2 text-gray-300">You Send</label>
+        <div className="flex rounded-lg overflow-hidden border border-gray-600 bg-gray-800">
+          <input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.00"
+            className="flex-1 p-3 bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <select 
+            value={fromCurrency}
+            onChange={(e) => setFromCurrency(e.target.value)}
+            className="p-3 bg-gray-700 text-white border-l border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="BTC">BTC</option>
+            <option value="ETH">ETH</option>
+            <option value="USDT">USDT</option>
+            <option value="ADA">ADA</option>
+            <option value="LTC">LTC</option>
+          </select>
+        </div>
+      </div>
 
-      {/* Add CSS for animation */}
-      <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.3s ease-out;
-        }
-      `}</style>
+      {/* To Currency - Dark theme */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium mb-2 text-gray-300">You Get</label>
+        <div className="flex rounded-lg overflow-hidden border border-gray-600 bg-gray-800">
+          <input
+            type="text"
+            readOnly
+            value={loading ? 'Calculating...' : calculatedAmount}
+            className="flex-1 p-3 bg-gray-800 text-white focus:outline-none"
+          />
+          <select 
+            value={toCurrency}
+            onChange={(e) => setToCurrency(e.target.value)}
+            className="p-3 bg-gray-700 text-white border-l border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="USDT">USDT</option>
+            <option value="BTC">BTC</option>
+            <option value="ETH">ETH</option>
+            <option value="ADA">ADA</option>
+            <option value="LTC">LTC</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Rate Type - FixedFloat jaisa design */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium mb-3 text-gray-300">Order Type</label>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => setRateType('fixed')}
+            className={`flex-1 p-3 rounded-lg font-medium transition-all border ${
+              rateType === 'fixed' 
+                ? 'bg-green-600 text-white border-green-500 shadow-lg' 
+                : 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
+            }`}
+          >
+            Fixed Rate (1.0%)
+          </button>
+          <button
+            type="button"
+            onClick={() => setRateType('float')}
+            className={`flex-1 p-3 rounded-lg font-medium transition-all border ${
+              rateType === 'float' 
+                ? 'bg-blue-600 text-white border-blue-500 shadow-lg' 
+                : 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
+            }`}
+          >
+            Float Rate (0.5%)
+          </button>
+        </div>
+      </div>
+
+      {/* Exchange Now Button - FixedFloat jaisa prominent button */}
+      <button 
+        onClick={handleExchange}
+        disabled={loading}
+        className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 rounded-lg font-bold text-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed transform hover:scale-105 duration-200"
+      >
+        {loading ? (
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+            Processing...
+          </div>
+        ) : (
+          'Exchange Now'
+        )}
+      </button>
+
+      {/* Additional Info - FixedFloat jaisa */}
+      <div className="mt-4 text-center">
+        <p className="text-xs text-gray-400">
+          By clicking Exchange Now, you agree to our Terms of Service
+        </p>
+      </div>
     </div>
   );
 }

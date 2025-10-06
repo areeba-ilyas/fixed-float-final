@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import React, { useEffect, useMemo, useState } from 'react';
 import { MdContentPaste, MdQrCodeScanner } from 'react-icons/md';
 
@@ -92,7 +93,9 @@ const coinColors: Record<string, string> = {
 };
 
 export default function Hero() {
+  const router = useRouter();
   const [darkMode, setDarkMode] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // existing UI state (unchanged)
   const [amountSend, setAmountSend] = useState('15.6682');
@@ -197,6 +200,60 @@ export default function Hero() {
     const tmpAmt = amountSend;
     setAmountSend(amountReceive);
     setAmountReceive(tmpAmt);
+  };
+
+  // --- Exchange Now Handler - SIMPLIFIED VERSION
+  const handleExchangeNow = async () => {
+    // Validate inputs
+    if (!destinationAddress.trim()) {
+      alert('Please enter destination address');
+      return;
+    }
+
+    if (!amountSend || parseFloat(amountSend) <= 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
+
+    if (!currentPair) {
+      alert('Please select valid currency pair');
+      return;
+    }
+
+    setIsProcessing(true);
+
+    // 2 second delay for processing effect
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    try {
+      // Directly create order data without API call
+      const orderData = {
+        id: 'PEZS2Q' + Math.random().toString(36).substr(2, 5).toUpperCase(),
+        fromCurrency: sendCurrency,
+        toCurrency: receiveCurrency,
+        fromAmount: parseFloat(amountSend),
+        toAmount: parseFloat(amountReceive),
+        toAddress: destinationAddress.trim(),
+        type: selectedOrderType,
+        status: 'pending',
+        timestamp: new Date().toISOString(),
+        // Generate random addresses for demo
+        fromAddress: 'bc1qrvh7l7dfjqgunnxxxjj4rae9prh5ggqdd0r', // Demo BTC address
+        timeRemaining: 1799 // 29 minutes 59 seconds
+      };
+
+      // Store order data in localStorage for order page
+      localStorage.setItem('currentOrder', JSON.stringify(orderData));
+      
+      // Redirect to order page
+      router.push(`/order?id=${orderData.id}`);
+      
+    } catch (error) {
+      console.error('Error creating order:', error);
+      alert('Error creating order. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const perUnit = (pair: RateItem) => pair.out / (pair.in || 1);
@@ -698,11 +755,20 @@ export default function Hero() {
     </div>
 
     {/* Exchange Now Button - Full width on mobile */}
-    <Link href={'/order'} className="w-full flex items-center justify-center mt-2">
-      <button className="bg-[#008FDF] text-white font-semibold py-3 rounded-lg hover:opacity-90 transition px-6 text-center text-sm">
-        Exchange now
-      </button>
-    </Link>
+    <button 
+      onClick={handleExchangeNow}
+      disabled={isProcessing}
+      className="w-full bg-[#008FDF] text-white font-semibold py-3 rounded-lg hover:opacity-90 transition px-6 text-center text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      {isProcessing ? (
+        <div className="flex items-center justify-center">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+          Processing...
+        </div>
+      ) : (
+        'Exchange now'
+      )}
+    </button>
   </div>
 
   {/* Desktop Layout */}
@@ -752,11 +818,20 @@ export default function Hero() {
       </div>
     </div>
     
-    <Link href={'/order'} className="flex-shrink-0">
-      <button className="bg-[#008FDF] text-white font-semibold px-8 py-3 rounded-lg text-xl hover:opacity-90 transition">
-        Exchange now
-      </button>
-    </Link>
+    <button 
+      onClick={handleExchangeNow}
+      disabled={isProcessing}
+      className="bg-[#008FDF] text-white font-semibold px-8 py-3 rounded-lg text-xl hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      {isProcessing ? (
+        <div className="flex items-center justify-center">
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+          Processing...
+        </div>
+      ) : (
+        'Exchange now'
+      )}
+    </button>
   </div>
 
   {/* Terms Text - Same for both */}

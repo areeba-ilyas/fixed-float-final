@@ -2,6 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+body {
+  background-color: #f9fafb !important;
+}
+
+.bg-gray-50 {
+  background-color: #f9fafb !important;
+}
+
+.bg-white {
+  background-color: #ffffff !important;
+}
+
+.text-gray-800 {
+  color: #1f2937 !important;
+}
+
+.bg-blue-600 {
+  background-color: #2563eb !important;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @keyframes comet-right-1 {

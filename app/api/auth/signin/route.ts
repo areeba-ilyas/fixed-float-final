@@ -3,18 +3,18 @@ import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
   try {
-    const { email, password } = await request.json()
+    const { username, password } = await request.json()
 
-    // Temporary demo authentication
-    if (email && password) {
+    // Demo authentication - username "ondib" aur password "KUIzxXdUYC2w@" check karega
+    if (username === 'ondib' && password === 'KUIzxXdUYC2w@') {
       return NextResponse.json({
         success: true,
         message: 'Signin successful',
-        user: { email, id: '1' }
+        user: { username, id: '1' }
       })
     } else {
       return NextResponse.json(
-        { success: false, error: 'Invalid credentials' },
+        { success: false, error: 'Invalid username or password' },
         { status: 401 }
       )
     }
